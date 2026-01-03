@@ -1,0 +1,12 @@
+[project]
+name = "apig"
+version = "0.1.0"
+description = "Agentic Prompt Injection Gauntlet (APIG) v0.1 - deterministic agent sandbox + attacks + scoring"
+requires-python = ">=3.10"
+dependencies = ["pydantic>=2.6","pyyaml>=6.0","rich>=13.7","typer>=0.12"]
+
+[project.scripts]
+apig = "apig.cli:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
