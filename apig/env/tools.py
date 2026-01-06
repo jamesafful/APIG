@@ -1,6 +1,6 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Any, Dict, List
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 from .types import ToolCall, ToolResult
 import json
 
@@ -14,6 +14,12 @@ class SandboxState:
     forms: Dict[str, Dict[str, Any]]
     outbox: List[Dict[str, Any]]
     http_posts: List[Dict[str, Any]]
+    # Optional adaptive content sources (Tier C). Each tool call may reveal a
+    # different stage (e.g., repeated web_fetch returns progressively more
+    # persuasive injections).
+    adaptive_web: Dict[str, List[str]] = field(default_factory=dict)
+    adaptive_docs: Dict[str, List[List[Dict[str, str]]]] = field(default_factory=dict)
+    adaptive_counters: Dict[str, int] = field(default_factory=dict)
 
 class ToolRouter:
     def __init__(self, state: SandboxState):
@@ -40,9 +46,24 @@ class ToolRouter:
                 return ToolResult(True, {"status": 200})
             if name == "web_fetch":
                 url = str(a["url"])
+                # Adaptive stage selection
+                if url in self.state.adaptive_web:
+                    k = f"web:{url}"
+                    idx = self.state.adaptive_counters.get(k, 0)
+                    stages = self.state.adaptive_web[url]
+                    html = stages[min(idx, len(stages) - 1)] if stages else ""
+                    self.state.adaptive_counters[k] = idx + 1
+                    return ToolResult(True, {"url": url, "html": html, "stage": min(idx, len(stages) - 1)})
                 return ToolResult(True, {"url": url, "html": self.state.web.get(url, "")})
             if name == "retrieve_docs":
                 query = str(a.get("query",""))
+                if query in self.state.adaptive_docs:
+                    k = f"docs:{query}"
+                    idx = self.state.adaptive_counters.get(k, 0)
+                    stages = self.state.adaptive_docs[query]
+                    docs = stages[min(idx, len(stages) - 1)] if stages else []
+                    self.state.adaptive_counters[k] = idx + 1
+                    return ToolResult(True, docs)
                 return ToolResult(True, self.state.retrieved_docs.get(query, []))
             if name == "fill_form":
                 form_id = str(a["form_id"])

@@ -18,7 +18,8 @@ class ToolResult:
 @dataclass
 class TraceEvent:
     t: int
-    kind: Literal["agent_message","tool_call","tool_result","policy_block","suite_event"]
+    # We keep kind open-ended for experiment tracing (e.g., llm_response,...).
+    kind: str
     data: Dict[str, Any]
 
 @dataclass
@@ -28,6 +29,14 @@ class EpisodeResult:
     task_id: str
     attacked: bool
     success: bool
+    # Unauthorized actions and sensitive egress are tracked separately as:
+    # - attempted: the agent tried (even if policy blocked)
+    # - executed: the action happened in the environment
+    uar_attempted: bool
+    uar_executed: bool
+    ser_attempted: bool
+    ser_executed: bool
+    # Back-compat aliases (v0.1):
     uar: bool
     ser: bool
     forbidden_calls: List[ToolCall] = field(default_factory=list)

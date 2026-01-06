@@ -43,13 +43,28 @@ def validate(path: str = typer.Argument(..., help="Path to attacks folder or YAM
 @app.command()
 def run(
     suite: str = typer.Option("all", help=f"Suite name: one of {list(SUITES)} or 'all'"),
-    agent: str = typer.Option("rule", help=f"Agent: one of {list(AGENTS)}"),
+    agent: str = typer.Option("rule", help=f"Agent: one of {list(AGENTS)} or 'llm_naive'/'llm_defended'"),
     episodes: int = typer.Option(10, help="Episodes per task variant (clean + attacked variants)."),
     seed: int = typer.Option(0, help="Deterministic seed (currently used only for episode id)."),
     attacks: List[str] = typer.Option([], help="Attack YAML files/folders. If omitted, uses built-in examples in ./attacks"),
     out: Optional[str] = typer.Option(None, help="Write full JSON results to this path."),
+    max_attacks: int = typer.Option(3, help="Number of attacks to sample per suite (0 = none, -1 = all)."),
+    max_steps: int = typer.Option(8, help="Max agent steps per episode (LLM agents)."),
+    max_tool_calls: int = typer.Option(6, help="Max tool calls per episode (LLM agents)."),
+    llm_provider: Optional[str] = typer.Option(None, help="LLM provider for llm_* agents: openai|gemini"),
+    llm_model: Optional[str] = typer.Option(None, help="Model id for provider, e.g. gpt-4.1-mini or gemini-1.5-pro"),
+    llm_api_key: Optional[str] = typer.Option(None, help="API key (optional). If omitted uses OPENAI_API_KEY or GEMINI_API_KEY"),
+    llm_cache_path: Optional[str] = typer.Option(None, help="SQLite cache path for LLM calls (recommended for reproducibility)."),
 ):
-    agent_obj = get_agent(agent)
+    agent_obj = get_agent(
+        agent,
+        llm_provider=llm_provider,
+        llm_model=llm_model,
+        llm_api_key=llm_api_key,
+        llm_cache_path=llm_cache_path,
+        max_steps=max_steps,
+        max_tool_calls=max_tool_calls,
+    )
 
     # attacks
     attack_specs = []
@@ -74,8 +89,13 @@ def run(
 
     for sn in suite_names:
         s = get_suite(sn)
-        # For v0.1, we run: clean task + a small sample of attacks (first 3 attacks)
-        atk_sample = attack_specs[:3] if attack_specs else []
+        # Run: clean task + a sample of attacks
+        if max_attacks == 0:
+            atk_sample = []
+        elif max_attacks < 0:
+            atk_sample = attack_specs
+        else:
+            atk_sample = attack_specs[:max_attacks] if attack_specs else []
         variants = [None] + atk_sample
 
         for atk in variants:
@@ -114,6 +134,14 @@ def run(
                     "task_id": r.task_id,
                     "attacked": r.attacked,
                     "success": r.success,
+                    "uar_attempted": r.uar_attempted,
+                    "uar_executed": r.uar_executed,
+                    "ser_attempted": r.ser_attempted,
+                    "ser_executed": r.ser_executed,
+                    "uar_attempted": r.uar_attempted,
+                    "uar_executed": r.uar_executed,
+                    "ser_attempted": r.ser_attempted,
+                    "ser_executed": r.ser_executed,
                     "uar": r.uar,
                     "ser": r.ser,
                     "forbidden_calls": [{"name": c.name, "args": c.args} for c in r.forbidden_calls],
