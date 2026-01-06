@@ -1,2 +1,10 @@
-.pytest_cache*
-*__pycache__*
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Pytest
+.pytest_cache/
+
+# Project-specific cache
+.apig_cache.sqlite
